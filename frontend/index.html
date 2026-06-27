@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Todo Pro App</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body class="app-bg flex">
+
+<!-- ================= SIDEBAR ================= -->
+<aside class="sidebar">
+
+  <div class="logo">
+    ⚡ TodoPro
+  </div>
+
+  <div class="stats">
+
+    <div class="stat">
+      <h3>Total Tasks</h3>
+      <p id="total">0</p>
+    </div>
+
+    <div class="stat">
+      <h3>Completed</h3>
+      <p id="done">0</p>
+    </div>
+
+    <div class="stat">
+      <h3>Pending</h3>
+      <p id="pending">0</p>
+    </div>
+
+  </div>
+
+  <button id="themeBtn" class="theme-btn">
+    🌙 Toggle Theme
+  </button>
+
+</aside>
+
+<!-- ================= MAIN ================= -->
+<main class="main">
+
+  <!-- HEADER -->
+  <header class="header">
+
+    <h1>Task Dashboard</h1>
+
+    <input id="search" class="search" placeholder="🔍 Search tasks..." />
+
+  </header>
+
+  <!-- ================= INPUT CARD ================= -->
+  <section class="card input-card">
+
+    <!-- TITLE + DATE -->
+    <div class="grid-2">
+
+      <input id="title" type="text" class="input" placeholder="✍️ Task title..." />
+
+      <input id="date" type="date" class="input" />
+
+    </div>
+
+    <!-- PRIORITY + CATEGORY -->
+    <div class="grid-2">
+
+      <select id="priority" class="input">
+        <option value="Low">🟢 Low</option>
+        <option value="Medium">🟡 Medium</option>
+        <option value="High">🔴 High</option>
+      </select>
+
+      <select id="category" class="input">
+        <option value="General">📌 General</option>
+        <option value="Work">💼 Work</option>
+        <option value="Study">📚 Study</option>
+        <option value="Personal">🏠 Personal</option>
+      </select>
+
+    </div>
+
+    <!-- DESCRIPTION -->
+    <textarea id="description" class="input textarea" placeholder="📝 Description..."></textarea>
+
+    <!-- ACTIONS -->
+    <div class="actions">
+
+      <button id="addBtn" class="btn-primary">
+        ➕ Add Task
+      </button>
+
+      <button id="clearBtn" class="btn-secondary">
+        ✖ Clear
+      </button>
+
+    </div>
+
+  </section>
+
+  <!-- ================= TASK LIST ================= -->
+  <section id="list" class="task-list"></section>
+
+</main>
+
+<!-- ================= TOAST ================= -->
+<div id="toast" class="toast-box"></div>
+
+<!-- SCRIPT -->
+<script src="script.js"></script>
+
+</body>
+</html>

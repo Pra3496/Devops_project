@@ -1,0 +1,294 @@
+/* =========================
+   RESET
+========================= */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+/* =========================
+   APP LAYOUT
+========================= */
+
+.app-bg {
+  display: flex;
+  min-height: 100vh;
+  background: #0f172a;
+  color: white;
+}
+
+/* =========================
+   SIDEBAR
+========================= */
+
+.sidebar {
+  width: 260px;
+  min-height: 100vh;
+  background: #111827;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+
+.logo {
+  font-size: 22px;
+  font-weight: bold;
+  color: #60a5fa;
+}
+
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.stat {
+  background: rgba(255,255,255,0.05);
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.stat h3 {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.stat p {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.theme-btn {
+  margin-top: auto;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  background: #2563eb;
+  color: white;
+}
+
+/* =========================
+   MAIN AREA
+========================= */
+
+.main {
+  flex: 1;
+  padding: 20px;
+}
+
+/* =========================
+   HEADER
+========================= */
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.header h1 {
+  font-size: 24px;
+}
+
+.search {
+  width: 250px;
+  padding: 10px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+}
+
+/* =========================
+   INPUT CARD
+========================= */
+
+.card {
+  background: rgba(255,255,255,0.05);
+  border-radius: 16px;
+  padding: 15px;
+  margin-bottom: 20px;
+}
+
+.input-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* GRID */
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* INPUTS */
+.input {
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  outline: none;
+  background: rgba(255,255,255,0.08);
+  color: inherit;
+  transition: 0.2s;
+}
+
+.input:focus {
+  transform: scale(1.02);
+  background: rgba(255,255,255,0.12);
+}
+
+/* TEXTAREA */
+.textarea {
+  min-height: 90px;
+  resize: none;
+}
+
+/* ACTIONS */
+.actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* BUTTONS */
+.btn-primary {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  background: #3b82f6;
+  color: white;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.btn-primary:hover {
+  background: #2563eb;
+}
+
+.btn-secondary {
+  flex: 1;
+  padding: 12px;
+  border-radius: 12px;
+  border: none;
+  cursor: pointer;
+  background: rgba(255,255,255,0.15);
+  color: white;
+  transition: 0.2s;
+}
+
+.btn-secondary:hover {
+  background: rgba(255,255,255,0.25);
+}
+
+/* =========================
+   TASK LIST
+========================= */
+
+.task-list {
+  display: grid;
+  gap: 12px;
+}
+
+/* TASK CARD */
+.task {
+  background: rgba(255,255,255,0.06);
+  padding: 15px;
+  border-radius: 14px;
+  transition: 0.25s;
+}
+
+.task:hover {
+  transform: translateY(-4px);
+  background: rgba(255,255,255,0.1);
+}
+
+.task b {
+  font-size: 16px;
+}
+
+.task p {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+/* DONE TASK */
+.task.done {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+/* TASK BUTTONS */
+.task button {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.task button:hover {
+  transform: scale(1.1);
+}
+
+/* =========================
+   TOAST
+========================= */
+
+.toast-box {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 999;
+}
+
+.toast {
+  background: rgba(0,0,0,0.75);
+  color: white;
+  padding: 10px 14px;
+  border-radius: 10px;
+  animation: slide 0.3s ease;
+}
+
+@keyframes slide {
+  from { transform: translateX(100px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* =========================
+   DARK MODE FIX
+========================= */
+
+.dark {
+  background: #0b1220;
+}
+
+.dark .sidebar {
+  background: #0f172a;
+}
+
+.dark .card,
+.dark .task {
+  background: rgba(255,255,255,0.05);
+}
+
+.dark .input {
+  background: #1e293b;
+  color: white;
+}
+
+.dark .search {
+  background: #1e293b;
+  color: white;
+}
