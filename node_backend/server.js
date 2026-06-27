@@ -1,485 +1,309 @@
-require("dotenv").config();
+const API = "http://127.0.0.1:4000/tasks";
 
-const express = require("express");
-const mysql = require("mysql2/promise");
-const cors = require("cors");
-const helmet = require("helmet");
-const compression = require("compression");
-const morgan = require("morgan");
+let tasks = [];
+let editTaskId = null;
 
-const app = express();
-const PORT = process.env.PORT || 4000;
+// ================= ELEMENTS =================
+const list = document.getElementById("list");
+const title = document.getElementById("title");
+const date = document.getElementById("date");
+const priority = document.getElementById("priority");
+const category = document.getElementById("category");
+const desc = document.getElementById("description");
+const search = document.getElementById("search");
 
-// =====================
-// Middleware
-// =====================
+const total = document.getElementById("total");
+const done = document.getElementById("done");
+const pending = document.getElementById("pending");
 
-app.use(helmet());
-app.use(compression());
+const addBtn = document.getElementById("addBtn");
+const clearBtn = document.getElementById("clearBtn");
+const toastBox = document.getElementById("toast");
+const themeBtn = document.getElementById("themeBtn");
 
-app.use(cors({
-    origin: "*",
-    methods: ["GET","POST","PUT","DELETE"],
-    allowedHeaders: ["Content-Type"]
-}));
+const inputCard = document.querySelector(".input-card");
+const collapseMainBtn = document.getElementById("collapseMainBtn");
 
-app.use(express.json({ limit: "2mb" }));
-app.use(morgan("dev"));
+// ================= INIT =================
+window.onload = () => {
+  loadTasks();
+};
 
-// =====================
-// MySQL Pool
-// =====================
+// ================= LOAD TASKS =================
+async function loadTasks() {
+  try {
+    const res = await fetch(API);
+    if (!res.ok) throw new Error("Server error");
+    tasks = await res.json();
 
-const pool = mysql.createPool({
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
+    render();
+    stats();
+  } catch (err) {
+    console.error("Fetch Error:", err);
+    toast("Server not connected", "error");
+  }
+}
 
-// =====================
-// Initialize Database
-// =====================
+// ================= ADD / UPDATE TASK =================
+addBtn.onclick = async () => {
+  const taskTitle = title.value.trim();
+  if (!taskTitle) {
+    toast("Enter task title", "error");
+    return;
+  }
 
-async function initDatabase() {
+  // Safe fallback to prevent runtime string-splitting errors
+  const formattedDate = date.value ? date.value.split("T")[0] : "";
 
-    const conn = await mysql.createConnection({
-        host: process.env.DB_HOST,
-        port: process.env.DB_PORT || 3306,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD
+  const task = {
+    title: taskTitle,
+    date: formattedDate,
+    priority: priority.value,
+    category: category.value,
+    description: desc.value.trim()
+  };
+
+  try {
+    let response;
+
+    // CREATE
+    if (editTaskId === null) {
+      task.done = false; // Prevent stats and toggle components from breaking
+
+      response = await fetch(API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(task)
+      });
+
+      if (!response.ok) throw new Error("Network save rejected");
+
+      Swal.fire({
+        position: "top-end",
+        icon: "success",
+        title: "Task Added",
+        showConfirmButton: false,
+        timer: 1500
+      });
+    } 
+    // UPDATE
+    else {
+      const existing = tasks.find(t => String(t.id) === String(editTaskId));
+
+      response = await fetch(`${API}/${editTaskId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...existing,
+          ...task
+        })
+      });
+
+      if (!response.ok) throw new Error("Network update rejected");
+
+      toast("Task Updated");
+      editTaskId = null;
+      addBtn.innerText = "➕ Add Task";
+    }
+
+    clear();
+    await loadTasks();
+
+  } catch (err) {
+    console.error("Database Save Exception:", err);
+    toast("Error saving task", "error");
+    
+    // Always refresh states so the application layout unfreezes
+    loadTasks();
+  }
+};
+
+// ================= DELETE TASK =================
+async function del(id) {
+  try {
+    const response = await fetch(`${API}/${id}`, {
+      method: "DELETE"
     });
-
-    await conn.query(
-        `CREATE DATABASE IF NOT EXISTS \`${process.env.DB_NAME}\``
-    );
-
-    await conn.end();
-
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS tasks (
-
-            id INT AUTO_INCREMENT PRIMARY KEY,
-
-            title VARCHAR(255) NOT NULL,
-
-            description TEXT DEFAULT NULL,
-
-            date DATE DEFAULT NULL,
-
-            priority ENUM('Low','Medium','High')
-                DEFAULT 'Medium',
-
-            category VARCHAR(100)
-                DEFAULT 'General',
-
-            done BOOLEAN DEFAULT FALSE,
-
-            created_at TIMESTAMP
-                DEFAULT CURRENT_TIMESTAMP,
-
-            updated_at TIMESTAMP
-                DEFAULT CURRENT_TIMESTAMP
-                ON UPDATE CURRENT_TIMESTAMP
-
-        )
-    `);
-
-    console.log("Database Ready");
-}
-
-// =====================
-// Validation
-// =====================
-
-function validateTask(body) {
-
-    if (!body.title || body.title.trim() === "") {
-        return "Title is required";
-    }
-
-    return null;
-}
-
-// =====================
-// Health
-// =====================
-
-app.get("/health", async (req, res) => {
-
-    try {
-
-        await pool.query("SELECT 1");
-
-        res.json({
-            status: "ok",
-            database: "connected",
-            uptime: process.uptime(),
-            timestamp: new Date().toISOString()
-        });
-
-    } catch {
-
-        res.status(500).json({
-            status: "error",
-            database: "disconnected"
-        });
-
-    }
-
-});
-
-// =====================
-// GET ALL TASKS
-// =====================
-
-app.get("/tasks", async (req, res) => {
-
-    try {
-
-        const [rows] = await pool.query(
-            "SELECT * FROM tasks ORDER BY id DESC"
-        );
-
-        rows.forEach(task => {
-            task.done = !!task.done;
-        });
-
-        res.json(rows);
-
-    } catch (err) {
-
-        console.error(err);
-
-        res.status(500).json({
-            message: "Failed to load tasks"
-        });
-
-    }
-
-});
-
-// =====================
-// GET ONE TASK
-// =====================
-
-app.get("/tasks/:id", async (req, res) => {
-
-    try {
-
-        const [rows] = await pool.query(
-            "SELECT * FROM tasks WHERE id=?",
-            [req.params.id]
-        );
-
-        if (!rows.length) {
-            return res.status(404).json({
-                message: "Task not found"
-            });
-        }
-
-        rows[0].done = !!rows[0].done;
-
-        res.json(rows[0]);
-
-    } catch {
-
-        res.status(500).json({
-            message: "Server error"
-        });
-
-    }
-
-});
-
-// =====================
-// CREATE TASK
-// =====================
-
-app.post("/tasks", async (req, res) => {
-
-    const error = validateTask(req.body);
-
-    if (error) {
-        return res.status(400).json({
-            message: error
-        });
-    }
-
-    const {
-
-        title,
-        description = "",
-        date = formatDate(date) || null,
-        priority = "Medium",
-        category = "General",
-        done = false
-
-    } = req.body;
-
-    try {
-
-        const [result] = await pool.query(
-
-            `INSERT INTO tasks
-            (title,description,date,priority,category,done)
-            VALUES (?,?,?,?,?,?)`,
-
-            [
-                title.trim(),
-                description,
-                date || null,
-                priority,
-                category,
-                done ? 1 : 0
-            ]
-
-        );
-
-        const [rows] = await pool.query(
-            "SELECT * FROM tasks WHERE id=?",
-            [result.insertId]
-        );
-
-        rows[0].done = !!rows[0].done;
-
-        res.status(201).json(rows[0]);
-
-    } catch (err) {
-
-        console.error(err);
-
-        res.status(500).json({
-            message: "Unable to create task"
-        });
-
-    }
-
-});
-function formatDate(date) {
-    if (!date) return null;
-
-    return new Date(date)
-        .toISOString()
-        .split("T")[0];
-}
-// =====================
-// UPDATE TASK
-// =====================
-
-app.put("/tasks/:id", async (req, res) => {
-    const id = Number(req.params.id);
-
-    if (!Number.isInteger(id) || id <= 0) {
-        return res.status(400).json({
-            message: "Invalid task id"
-        });
-    }
-
-    const error = validateTask(req.body);
-
-    if (error) {
-        return res.status(400).json({
-            message: error
-        });
-    }
-
-    const {
-        title,
-        description = "",
-        date = null,
-        priority = "Medium",
-        category = "General",
-        done = false
-    } = req.body;
-
-    try {
-        const [exists] = await pool.query(
-            "SELECT id FROM tasks WHERE id=?",
-            [id]
-        );
-
-        if (!exists.length) {
-            return res.status(404).json({
-                message: "Task not found"
-            });
-        }
-
-        await pool.query(
-            `UPDATE tasks
-             SET
-                title=?,
-                description=?,
-                date=?,
-                priority=?,
-                category=?,
-                done=?
-             WHERE id=?`,
-            [
-                title.trim(),
-                description,
-                date || null,
-                priority,
-                category,
-                done ? 1 : 0,
-                id
-            ]
-        );
-
-        const [rows] = await pool.query(
-            "SELECT * FROM tasks WHERE id=?",
-            [id]
-        );
-
-        rows[0].done = !!rows[0].done;
-
-        res.json(rows[0]);
-
-    } catch (err) {
-        console.error(err);
-
-        res.status(500).json({
-            message: "Unable to update task"
-        });
-    }
-});
-
-// =====================
-// DELETE TASK
-// =====================
-
-app.delete("/tasks/:id", async (req, res) => {
-
-    const id = Number(req.params.id);
-
-    if (!Number.isInteger(id) || id <= 0) {
-        return res.status(400).json({
-            message: "Invalid task id"
-        });
-    }
-
-    try {
-
-        const [result] = await pool.query(
-            "DELETE FROM tasks WHERE id=?",
-            [id]
-        );
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({
-                message: "Task not found"
-            });
-        }
-
-        res.json({
-            success: true,
-            message: "Task deleted"
-        });
-
-    } catch (err) {
-
-        console.error(err);
-
-        res.status(500).json({
-            message: "Unable to delete task"
-        });
-
-    }
-
-});
-
-// =====================
-// 404
-// =====================
-
-app.use((req, res) => {
-    res.status(404).json({
-        message: "Route not found"
-    });
-});
-
-// =====================
-// Global Error Handler
-// =====================
-
-app.use((err, req, res, next) => {
-
+    if (!response.ok) throw new Error("Delete failed on server");
+
+    toast("Task Deleted", "error");
+    loadTasks();
+  } catch (err) {
     console.error(err);
+    toast("Delete failed", "error");
+  }
+}
 
-    res.status(500).json({
-        message: "Internal Server Error"
+// ================= TOGGLE TASK =================
+async function toggleTask(id) {
+  const task = tasks.find(t => String(t.id) === String(id));
+  if (!task) return;
+
+  try {
+    const response = await fetch(`${API}/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...task,
+        done: !task.done
+      })
     });
+    if (!response.ok) throw new Error("Toggle update failed");
 
-});
-
-// =====================
-// Start Server
-// =====================
-
-async function startServer() {
-
-    try {
-
-        await initDatabase();
-
-        app.listen(PORT, () => {
-            console.log(`====================================`);
-            console.log(`Server running on port ${PORT}`);
-            console.log(`Health : http://127.0.0.1:${PORT}/health`);
-            console.log(`Tasks  : http://127.0.0.1:${PORT}/tasks`);
-            console.log(`====================================`);
-        });
-
-    } catch (err) {
-
-        console.error("Failed to start server");
-        console.error(err);
-
-        process.exit(1);
-
-    }
-
+    loadTasks();
+  } catch (err) {
+    console.error(err);
+    toast("Toggle failed", "error");
+  }
 }
 
-startServer();
+// ================= EDIT TASK =================
+function editTask(id) {
+  const task = tasks.find(t => String(t.id) === String(id));
+  if (!task) return;
 
-// =====================
-// Graceful Shutdown
-// =====================
+  title.value = task.title;
+  date.value = task.date || "";
+  priority.value = task.priority;
+  category.value = task.category;
+  desc.value = task.description || "";
 
-async function shutdown(signal) {
+  editTaskId = id;
+  addBtn.innerText = "✏ Update Task";
 
-    console.log(`${signal} received`);
-
-    try {
-
-        await pool.end();
-
-        console.log("MySQL pool closed");
-
-        process.exit(0);
-
-    } catch (err) {
-
-        console.error(err);
-
-        process.exit(1);
-
-    }
-
+  if (inputCard) {
+    inputCard.classList.remove("collapsed-note");
+    title.placeholder = "What needs to be done?";
+  }
 }
 
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
+// ================= RENDER =================
+function render(data = tasks) {
+  list.innerHTML = "";
 
-process.on("unhandledRejection", err => {
-    console.error("Unhandled Rejection:", err);
-});
+  if (data.length === 0) {
+    list.innerHTML = `<p class="opacity-60 text-sm font-medium italic py-4">No tasks found in your system.</p>`;
+    return;
+  }
 
-process.on("uncaughtException", err => {
-    console.error("Uncaught Exception:", err);
-});
+  data.forEach(task => {
+    const badgeColor = task.priority === "High" 
+      ? "bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30" 
+      : task.priority === "Medium" 
+      ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30" 
+      : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30";
+
+    // Fixed ID wrapping inside single quotes to avoid evaluation compilation exceptions
+    list.innerHTML += `
+      <div class="task w-full ${task.done ? 'done' : ''}">
+        <div class="flex-1 min-w-0 pr-4">
+          <div class="flex flex-wrap items-center gap-2 mb-1.5">
+            <b class="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100 break-words">${task.title}</b>
+            <span class="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${badgeColor}">${task.priority}</span>
+            <span class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-500/20">${task.category}</span>
+          </div>
+          <p class="text-sm text-slate-600 dark:text-slate-300 mb-2 leading-relaxed break-words font-medium">${task.description || "No description provided."}</p>
+          <div class="flex items-center text-xs text-slate-500 dark:text-slate-400 gap-1.5 font-bold">
+            <span>📅 ${task.date ? task.date : "No Date"}</span>
+          </div>
+        </div>
+        <div class="flex sm:flex-col md:flex-row gap-2 self-end sm:self-center shrink-0">
+          <button onclick="toggleTask('${task.id}')" class="bg-emerald-600 hover:bg-emerald-500 shadow-sm" title="Complete task">✔</button>
+          <button onclick="editTask('${task.id}')" class="bg-amber-500 hover:bg-amber-400 shadow-sm" title="Edit task">✏</button>
+          <button onclick="del('${task.id}')" class="bg-rose-600 hover:bg-rose-500 shadow-sm" title="Delete task">🗑</button>
+        </div>
+      </div>
+    `;
+  });
+}
+
+// ================= SEARCH =================
+search.oninput = () => {
+  const q = search.value.toLowerCase();
+  const filtered = tasks.filter(t => t.title.toLowerCase().includes(q));
+  render(filtered);
+};
+
+// ================= STATS =================
+function stats() {
+  const totalCount = tasks.length;
+  const completedCount = tasks.filter(t => t.done).length;
+
+  total.innerText = totalCount;
+  done.innerText = completedCount;
+  pending.innerText = totalCount - completedCount;
+}
+
+// ================= CLEAR =================
+function clear() {
+  title.value = "";
+  date.value = "";
+  desc.value = "";
+
+  editTaskId = null;
+  addBtn.innerText = "➕ Add Task";
+
+  if (inputCard) {
+    inputCard.classList.add("collapsed-note");
+    title.placeholder = "Add the Task";
+  }
+}
+
+// ================= CLEAR BTN =================
+clearBtn.onclick = clear;
+
+// ================= THEME =================
+themeBtn.onclick = () => {
+  document.body.classList.toggle("dark");
+};
+
+// ================= TOAST =================
+function toast(msg, type = "success") {
+  const div = document.createElement("div");
+  div.className = "toast shadow-xl";
+  if (type === "error") {
+    div.style.borderLeftColor = "#ef4444";
+  }
+  div.innerText = msg;
+
+  toastBox.appendChild(div);
+
+  setTimeout(() => {
+    div.style.opacity = '0';
+    div.style.transform = 'translateY(10px)';
+    div.style.transition = 'all 0.2s ease';
+    setTimeout(() => div.remove(), 200);
+  }, 2000);
+}
+
+// ================= COLLAPSIBLE FORM TOGGLE =================
+if (collapseMainBtn) {
+  collapseMainBtn.onclick = () => {
+    const mainElement = document.querySelector(".main");
+    if (mainElement) {
+      mainElement.classList.toggle("collapsed-view");
+    }
+  };
+}
+
+// ================= GOOGLE NOTES EXPAND/COLLAPSE ENGINE =================
+if (inputCard && title) {
+  inputCard.onclick = () => {
+    if (inputCard.classList.contains("collapsed-note")) {
+      inputCard.classList.remove("collapsed-note");
+      title.placeholder = "What needs to be done?";
+      title.focus();
+    }
+  };
+
+  document.addEventListener("click", (e) => {
+    if (!inputCard.contains(e.target) && !editTaskId) {
+      const titleValue = title.value.trim();
+      const descValue = desc.value.trim();
+      if (!titleValue && !descValue) {
+        inputCard.classList.add("collapsed-note");
+        title.placeholder = "Add the Task";
+      }
+    }
+  });
+}
