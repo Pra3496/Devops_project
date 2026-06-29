@@ -69,7 +69,7 @@ async function initDatabase() {
 
             description TEXT DEFAULT NULL,
 
-            date DATE DEFAULT NULL,
+            date VARCHAR(30) NULL,
 
             priority ENUM('Low','Medium','High')
                 DEFAULT 'Medium',
@@ -214,7 +214,7 @@ app.post("/tasks", async (req, res) => {
 
         title,
         description = "",
-        date = formatDate(date) || null,
+        date = formatDate(req.body.date) || null,
         priority = "Medium",
         category = "General",
         done = false
